@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hub Anomaly Portal - Shadowfax</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:#f5f7f9;color:#333;overflow:hidden;height:100vh}
+:root{--teal:#0B9B8A;--td:#078272;--tl:#12b09e;--tbg:rgba(11,155,138,.06);--w:#fff;--bg:#f5f7f9;--bdr:#e8ecf0;--tx:#333;--txl:#888;--txm:#aaa;--sh:0 2px 12px rgba(0,0,0,.06);--shl:0 8px 24px rgba(0,0,0,.12);--react:#FF6D00;--sw:260px}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+.lo{position:fixed;inset:0;z-index:3000;background:var(--w);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all .5s}.lo.hide{opacity:0;pointer-events:none}
+.lo-brand{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.lo .lo-sub{color:var(--td);font-size:18px;font-weight:700;margin-top:8px;margin-bottom:4px}.lo .lo-sub2{color:var(--txm);font-size:11px;margin-bottom:24px}
+.ua{display:flex;flex-direction:column;gap:8px;align-items:center;width:440px;max-width:95vw}
+.ub{display:flex;align-items:center;gap:12px;background:var(--w);border:2px dashed var(--bdr);padding:11px 16px;border-radius:10px;cursor:pointer;transition:all .3s;width:100%;box-shadow:var(--sh)}.ub:hover{border-color:var(--teal);background:var(--tbg)}.ub.loaded{border-color:var(--teal);border-style:solid;background:var(--tbg)}
+.gs{font-size:9px;margin-top:3px;color:var(--txm)}.gs.ok{color:var(--teal)}.gs.err{color:#c62828}
+.od{text-align:center;font-size:9px;color:var(--txm)}
+.startb{background:linear-gradient(135deg,var(--teal),var(--td));color:var(--w);border:none;padding:12px 36px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px;display:none;box-shadow:0 4px 16px rgba(11,155,138,.3)}.startb.show{display:block;animation:pulse 2s ease infinite}
+.pw{width:100%;margin-top:10px;display:none}.pw.show{display:block}.pl{font-size:10px;color:var(--txl);margin-bottom:3px;text-align:center}.pbw{width:100%;height:4px;background:var(--bdr);border-radius:4px;overflow:hidden}.pfl{height:100%;background:linear-gradient(90deg,var(--teal),var(--tl));width:0%;transition:width .3s}
+.app{display:none;height:100vh;flex-direction:column}
+.hdr{background:var(--w);border-bottom:1px solid var(--bdr);padding:5px 14px;display:flex;align-items:center;gap:8px;z-index:1001;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.hdr .br{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pn{font-size:11px;font-weight:700;color:var(--tx);padding-left:8px;border-left:2px solid var(--bdr);margin-left:3px;white-space:nowrap}
+.hacts{display:flex;gap:3px;margin-left:auto;align-items:center}
+.hbtn{background:var(--w);color:var(--txl);border:1px solid var(--bdr);padding:4px 8px;border-radius:5px;cursor:pointer;font-size:9px;display:flex;align-items:center;gap:2px;font-weight:500}.hbtn:hover{border-color:var(--teal);color:var(--teal)}
+.hbtn .sp{width:9px;height:9px;border:2px solid var(--bdr);border-top-color:var(--teal);border-radius:50%;animation:spin .6s linear infinite;display:none}
+label.hbtn{cursor:pointer}
+.main{flex:1;position:relative;overflow:hidden}
+.kstrip{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:999;display:flex;gap:3px}
+.kp{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border:1px solid var(--bdr);border-radius:6px;padding:4px 9px;display:flex;align-items:center;gap:4px;box-shadow:var(--sh);white-space:nowrap}
+.kp .kv{font-size:12px;font-weight:800}.kp .kl{font-size:7px;color:var(--txm);font-weight:600;text-transform:uppercase}
+.kp.svc .kv{color:#2e7d32}.kp.nsvc .kv{color:#c62828}.kp.tot .kv{color:var(--teal)}.kp.hub .kv{color:#1565c0}.kp.pct .kv{color:#8a870e}
+.sidebar{position:absolute;top:0;left:0;bottom:0;width:var(--sw);background:rgba(255,255,255,.97);backdrop-filter:blur(12px);border-right:1px solid var(--bdr);z-index:1000;transform:translateX(0);transition:transform .25s;display:flex;flex-direction:column;box-shadow:2px 0 16px rgba(0,0,0,.06);overflow:hidden}
+.sidebar.collapsed{transform:translateX(calc(-1 * var(--sw)))}
+.sb-tgl{position:absolute;top:50%;right:-24px;transform:translateY(-50%);width:24px;height:40px;background:rgba(255,255,255,.97);border:1px solid var(--bdr);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--txl);z-index:1001}.sb-tgl:hover{color:var(--teal)}
+.sb-hd{padding:9px 10px 7px;border-bottom:1px solid var(--bdr);flex-shrink:0;font-size:14px;font-weight:700;color:var(--teal)}
+.sb-bd{flex:1;overflow-y:auto;padding:6px 10px}
+.sb-s{margin-bottom:10px}.sb-st{font-size:11px;font-weight:600;color:var(--txm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.sb-f{margin-bottom:6px}.sb-f>label{font-size:11px;font-weight:600;color:var(--txl);display:block;margin-bottom:2px}
+.sb-sel{width:100%;padding:6px 24px 6px 9px;border:1px solid var(--bdr);border-radius:5px;font-size:12px;font-family:'Inter',sans-serif;background:var(--w);color:var(--txl);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23999' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;cursor:pointer}.sb-sel:focus{outline:none;border-color:var(--teal)}
+.hub-dd-wrap{position:relative}.hub-dd-input{width:100%;padding:6px 9px;border:1px solid var(--bdr);border-radius:5px;font-size:12px;font-family:'Inter',sans-serif;background:var(--w);color:var(--txl)}.hub-dd-input:focus{outline:none;border-color:var(--teal)}
+.hub-dd-list{position:absolute;top:100%;left:0;right:0;background:var(--w);border:1px solid var(--bdr);border-radius:5px;box-shadow:var(--shl);z-index:2000;max-height:180px;overflow-y:auto;display:none;margin-top:1px}.hub-dd-list.open{display:block}
+.hub-dd-item{padding:6px 9px;font-size:12px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hub-dd-item:hover{background:var(--tbg);color:var(--teal)}
+.sb-btn{width:100%;padding:7px;border:1px solid var(--bdr);border-radius:5px;background:var(--w);color:var(--txl);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;margin-bottom:4px}.sb-btn:hover{border-color:var(--teal);color:var(--teal)}.sb-btn.on{background:var(--teal);color:var(--w);border-color:var(--teal)}
+.sb-rst{width:100%;padding:6px;border:1px solid var(--bdr);border-radius:5px;background:var(--bg);color:var(--txm);font-size:11px;cursor:pointer;text-align:center;margin-top:4px}.sb-rst:hover{color:var(--teal);border-color:var(--teal)}
+.sb-rst.hs-clear{background:#fff3e0;color:#e65100;border-color:#ffe0b2;display:none;font-size:11px}
+.map-w{position:absolute;inset:0}.map-w>div{width:100%;height:100%}
+.mleg{position:absolute;top:6px;right:6px;z-index:999;background:rgba(255,255,255,.96);border:1px solid var(--bdr);border-radius:7px;padding:6px 8px;min-width:120px;max-height:40vh;overflow-y:auto;box-shadow:var(--sh);font-size:8px}
+.mleg h4{font-size:7px;font-weight:700;color:var(--txm);text-transform:uppercase;margin-bottom:2px}
+.li{display:flex;align-items:center;gap:4px;padding:1px 0;font-size:8px;color:var(--txl)}.li .lc{width:10px;height:6px;border-radius:2px;flex-shrink:0}.li .lic{width:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.leaflet-popup-content-wrapper{background:var(--w)!important;color:var(--tx)!important;border:1px solid var(--bdr)!important;border-radius:9px!important;box-shadow:var(--shl)!important}
+.leaflet-popup-tip{background:var(--w)!important}.leaflet-popup-close-button{color:var(--txm)!important;font-size:14px!important}
+.popt{font-size:12px;font-weight:800;color:var(--tx);text-align:center;margin-bottom:2px}
+.poptbl{width:100%;border-collapse:collapse;font-size:8px}.poptbl td{padding:3px 6px;border-bottom:1px solid #f0f2f4}.poptbl td:first-child{color:var(--txm);font-weight:500;white-space:nowrap}.poptbl td:last-child{font-weight:600;color:var(--tx);text-align:right}.poptbl tr:last-child td{border-bottom:none}
+.hp-t{font-size:13px;font-weight:800;color:var(--teal);text-align:center;margin-bottom:4px}
+.hp-ch{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:6px}
+.hp-c{background:var(--tbg);border:1px solid rgba(11,155,138,.15);border-radius:5px;padding:2px 6px;font-size:8px;font-weight:600;color:var(--teal)}
+input[type="file"]{display:none}
+.hub-home-icon{display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:#f0f2f4}::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+/* Measure Distance */
+body.crosshair-mode .leaflet-container{cursor:crosshair!important}
+.hbtn.measure-btn{background:var(--w);color:var(--txl);border:1px solid var(--bdr);font-weight:600;gap:4px;transition:all .15s}
+.hbtn.measure-btn:hover{border-color:var(--teal);color:var(--teal);background:var(--tbg)}
+.hbtn.measure-btn.active{background:var(--teal);color:var(--w);border-color:var(--teal)}
+.hbtn.measure-stop{background:#fff3e0;color:#e65100;border-color:#ffe0b2;font-weight:600}
+.hbtn.measure-stop:hover{background:#ffe0b2}
+.dist-panel{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.97);backdrop-filter:blur(12px);border:1px solid var(--bdr);border-radius:10px;padding:10px 16px;z-index:999;display:none;min-width:340px;max-width:480px;box-shadow:var(--shl)}
+.dist-panel.show{display:flex;flex-direction:column;gap:4px}
+.dp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.dp-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--txm)}
+.dp-close{background:none;border:none;color:var(--txm);cursor:pointer;font-size:14px;padding:0 2px;line-height:1}.dp-close:hover{color:#e53935}
+.dist-type-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.dist-type-row>label{font-size:9px;font-weight:700;color:var(--txm);text-transform:uppercase;white-space:nowrap}
+.dist-sel{padding:3px 8px;border:1px solid var(--bdr);border-radius:5px;font-size:11px;font-family:inherit;font-weight:600;color:var(--tx);background:var(--w);cursor:pointer;outline:none}.dist-sel:focus{border-color:var(--teal)}
+.d-seg-list{max-height:160px;overflow-y:auto;margin:2px 0}
+.d-seg-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:11px;border-bottom:1px solid #f0f2f4}.d-seg-row:last-child{border-bottom:none}
+.d-seg-row .seg-label{color:var(--txl);width:50px;flex-shrink:0;font-weight:700;font-size:10px}
+.d-seg-row .seg-dist{font-weight:700;font-size:12px;flex:1}
+.d-seg-row .seg-time{color:#1565c0;font-size:10px;font-weight:600;text-align:right}
+.d-total-row{display:flex;align-items:center;gap:10px;padding-top:6px;border-top:2px solid var(--bdr);margin-top:2px}
+.d-total-row .t-label{font-size:9px;color:var(--txm);font-weight:700;text-transform:uppercase;width:50px;flex-shrink:0}
+.d-total-row .t-dist{font-size:15px;font-weight:800;flex:1}
+.d-total-row .t-time{font-size:12px;font-weight:700;color:#1565c0;text-align:right}
+.d-note{font-size:8px;color:var(--txm);font-style:italic;margin-top:3px}
+.d-esc{font-size:8px;color:var(--txm);text-align:center;margin-top:2px}
+.d-toast{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:var(--teal);border-radius:6px;padding:6px 16px;font-size:11px;font-weight:600;color:var(--w);z-index:1001;display:none;white-space:nowrap;box-shadow:var(--sh)}.d-toast.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="lo" id="lo">
+  <div class="lo-brand"><div><div style="font-size:32px;font-weight:800;color:var(--teal);letter-spacing:-1px">SHADOWFAX</div><div style="font-size:13px;color:var(--tl);font-style:italic;margin-top:-4px;text-align:right">Think ahead!</div></div></div>
+  <p class="lo-sub">Hub Anomaly Portal</p><p class="lo-sub2">Loading data automatically... (GeoJSON ~25MB, may take 30-60 sec)</p>
+  <div class="ua">
+    <div class="pw show" id="pw"><div class="pl" id="pl">Initializing...</div><div class="pbw"><div class="pfl" id="pf"></div></div></div>
+    <div class="gs" id="gsSt" style="text-align:center;margin-top:8px"></div>
+    <div style="margin-top:12px;text-align:center"><div class="od">—— or load manually ——</div>
+      <div style="display:flex;gap:6px;justify-content:center;margin-top:6px">
+        <label class="hbtn" style="font-size:10px;padding:6px 12px">Upload GeoJSON<input type="file" id="geoF" accept=".geojson,.json"></label>
+        <label class="hbtn" style="font-size:10px;padding:6px 12px">Upload CSV<input type="file" id="csvF" accept=".csv"></label>
+      </div>
+      <button class="startb" id="startBtn" onclick="startPortal()">Launch Portal →</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <div class="hdr">
+    <div class="br"><div><div style="font-size:13px;font-weight:800;color:var(--teal);letter-spacing:-.3px">SHADOWFAX</div><div style="font-size:6px;color:var(--tl);font-style:italic;margin-top:-1px;text-align:right">Think ahead!</div></div><div class="pn">Hub Anomaly Portal</div></div>
+    <div class="hacts">
+      <button class="hbtn" onclick="refreshAll()">Refresh <span class="sp" id="rSp"></span></button>
+      <label class="hbtn">GeoJSON<input type="file" id="gfT" accept=".geojson,.json"></label>
+      <button class="hbtn measure-btn" id="btnMeasure" onclick="toggleMeasure()"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22L22 2"/><path d="M6 18l2-2M10 14l2-2M14 10l2-2M18 6l2-2"/><circle cx="2" cy="22" r="1.5" fill="currentColor"/><circle cx="22" cy="2" r="1.5" fill="currentColor"/></svg>Measure Distance</button>
+      <button class="hbtn measure-stop" id="btnMStop" style="display:none" onclick="stopMeasure()">Stop</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="dist-panel" id="distPanel">
+      <div class="dp-header">
+        <div class="dp-title">Measure Distance</div>
+        <button class="dp-close" onclick="stopMeasure()" title="Close (Esc)">✕</button>
+      </div>
+      <div class="dist-type-row">
+        <label>Distance</label>
+        <select class="dist-sel" id="distSel" onchange="onDistTypeChange()">
+          <option value="aerial">Aerial Distance</option>
+          <option value="route" selected>Route Distance</option>
+        </select>
+      </div>
+      <div class="d-seg-list" id="dSegList"></div>
+      <div class="d-total-row">
+        <div class="t-label">Total</div>
+        <div class="t-dist" id="dTotDist">—</div>
+        <div class="t-time" id="dTotTime">—</div>
+      </div>
+      <div class="d-note" id="dNote"></div>
+      <div class="d-esc">Press <b>ESC</b> to clear</div>
+    </div>
+    <div class="d-toast" id="dToast"></div>
+
+    <div class="map-w"><div id="map"></div></div>
+    <div class="kstrip">
+      <div class="kp tot"><div class="kl">Total Hubs</div><div class="kv" id="k3h">—</div></div>
+      <div class="kp svc"><div class="kl">Inside Boundary</div><div class="kv" id="k3in">—</div></div>
+      <div class="kp nsvc"><div class="kl">Outside</div><div class="kv" id="k3out">—</div></div>
+      <div class="kp hub"><div class="kl">Merger Hubs</div><div class="kv" id="k3m">—</div></div>
+      <div class="kp pct"><div class="kl">Total Pins</div><div class="kv" id="k3p">—</div></div>
+    </div>
+
+    <div class="sidebar" id="sb"><div class="sb-tgl" onclick="tgSB()">◀</div><div class="sb-hd">Hub Anomaly</div>
+      <div class="sb-bd">
+        <div class="sb-s"><div class="sb-st">Filters</div>
+          <div class="sb-f"><label>Anomaly Filter</label><div id="ss_f3anom"></div></div>
+          <div class="sb-f"><label>Merger Remarks</label><div id="ss_f3merger"></div></div>
+          <div class="sb-f"><label>Pin Type</label><div id="ss_f3pt"></div></div>
+          <div class="sb-f"><label>Region</label><div id="ss_f3r"></div></div>
+          <div class="sb-f"><label>State</label><div id="ss_f3st"></div></div>
+          <div class="sb-f"><label>POD</label><div id="ss_f3p"></div></div>
+          <div class="sb-f"><label>City</label><div id="ss_f3c"></div></div>
+          <div class="sb-f"><label>Svc Remarks</label><div id="ss_f3sr"></div></div>
+          <div class="sb-rst" onclick="rf3()">Reset All</div>
+        </div>
+        <div class="sb-s"><div class="sb-st">Search Hub</div>
+          <div class="sb-f"><div class="hub-dd-wrap"><input class="hub-dd-input" id="hdi" placeholder="Type hub..." oninput="hubDD()" onfocus="hubDD()"><div class="hub-dd-list" id="hdl"></div></div></div>
+          <div class="sb-rst hs-clear" id="hsc" onclick="clrHub()">Clear Hub</div>
+        </div>
+        <div class="sb-s"><div class="sb-st">Actions</div>
+          <button class="sb-btn" id="hubTableBtn" onclick="toggleHubTable()">Show Hub List</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mleg"><h4>Legend</h4>
+      <div class="li"><div class="lc" style="background:var(--teal);opacity:.3;border:2px solid var(--teal)"></div>Inside</div>
+      <div class="li"><div class="lc" style="background:#e53935;opacity:.3;border:2px dashed #e53935"></div>Outside</div>
+      <div class="li"><div class="lic"><svg viewBox="0 0 24 24" width="9" height="9"><path d="M3 21V10l9-7 9 7v11H14v-6h-4v6z" fill="#43a047" stroke="#1b5e20" stroke-width="1.5" stroke-linejoin="round"/></svg></div>Self Hub</div>
+      <div class="li"><div class="lic"><svg viewBox="0 0 24 24" width="9" height="9"><path d="M3 21V10l9-7 9 7v11H14v-6h-4v6z" fill="#ff9800" stroke="#e65100" stroke-width="1.5" stroke-linejoin="round"/></svg></div>Franchise Hub</div>
+    </div>
+
+    <div id="hubTablePanel" style="display:none;position:absolute;bottom:6px;left:50%;transform:translateX(-50%);z-index:999;background:rgba(255,255,255,.98);backdrop-filter:blur(12px);border:1px solid var(--bdr);border-radius:10px;padding:10px;max-width:700px;width:90%;box-shadow:var(--shl);max-height:250px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h4 style="font-size:11px;font-weight:700;color:var(--teal)">Hub List</h4><button onclick="toggleHubTable()" style="background:none;border:none;color:var(--txm);cursor:pointer;font-size:14px">✕</button></div>
+      <div style="max-height:200px;overflow-y:auto" id="hubTableContent"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   CONFIG — update these for your data sources
+   ════════════════════════════════════════════════════════════ */
+const SID='1-d3YUOaNlMpjZ6rYgGgmX3n0rlpt8mF0_5gVcdampvI';
+const GID_BASE='0', GID_HUB='1073579012';
+const GURL=id=>'https://docs.google.com/spreadsheets/d/'+SID+'/gviz/tq?tqx=out:csv&gid='+id;
+const GEO_URL='data/boundaries.geojson';
+const IB=[[4,63],[40,100]];
+
+/* ════════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════════ */
+let gjD=null, gsD=[], hmD=[], aM=[], fM3=[];
+let allHubNames=[];
+let hubMergerCache={};
+let hubBdData=[];
+let hsL=null;
+let map, hbL, hmL;
+const cvs=L.canvas({padding:.5,tolerance:5});
+
+/* ════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════ */
+function gv(o,k){return(o[k]||'').toString().trim()}
+function sr(d){return gv(d,'Serviceability Remarks').toLowerCase()}
+function isSvc(d){return sr(d)==='sfx serviceable'}
+function isNS(d){return sr(d)==='non serviceable'}
+function isRe(d){return sr(d)==='need reactivation'}
+function setProg(p,l){const pf=document.getElementById('pf'),pl=document.getElementById('pl');if(pf)pf.style.width=p+'%';if(l&&pl)pl.textContent=l}
+function tgSB(){const sb=document.getElementById('sb');sb.classList.toggle('collapsed');sb.querySelector('.sb-tgl').textContent=sb.classList.contains('collapsed')?'▶':'◀'}
+function haversine(a,b,c,d){const R=6371,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+
+function createSS(id,items,onChange){const el=document.getElementById(id);if(!el)return;let h=`<select class="sb-sel" id="${id}_sel" onchange="${onChange}"><option value="">All</option>`;[...items].sort().forEach(i=>{if(i)h+=`<option value="${i}">${i}</option>`});el.innerHTML=h+'</select>'}
+function getSSVal(id){const s=document.getElementById(id+'_sel');return s?s.value:''}
+function clearSS(id){const s=document.getElementById(id+'_sel');if(s)s.value=''}
+
+/* ════════════════════════════════════════════════════════════
+   INIT MAP
+   ════════════════════════════════════════════════════════════ */
+map=L.map('map',{zoomControl:true,preferCanvas:true,renderer:cvs,maxBounds:IB,maxBoundsViscosity:1,minZoom:4}).setView([22.5,82],5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:18}).addTo(map);
+hbL=L.layerGroup().addTo(map);
+hmL=L.layerGroup().addTo(map);
+
+/* ════════════════════════════════════════════════════════════
+   DATA LOADING
+   ════════════════════════════════════════════════════════════ */
+function autoLoad(){const st=document.getElementById('gsSt');setProg(5,'Loading...');st.textContent='Loading...';st.className='gs';
+  let sDone=0,gDone=0;const need=2;
+  function check(){if(sDone>=need&&gDone)finishLoad()}
+  Papa.parse(GURL(GID_BASE),{download:true,header:true,skipEmptyLines:true,dynamicTyping:false,complete:r=>{if(r.data?.length){gsD=r.data;gsD.forEach(row=>{if(row.Pincode)row.Pincode=String(row.Pincode).trim().split('.')[0]})}sDone++;st.textContent='Base: '+gsD.length+'...';setProg(20,'Base loaded...');check()},error:()=>{sDone++;check()}});
+  Papa.parse(GURL(GID_HUB),{download:true,header:true,skipEmptyLines:true,dynamicTyping:false,complete:r=>{if(r.data?.length)hmD=r.data;sDone++;setProg(30,'Hub data...');check()},error:()=>{sDone++;check()}});
+  setProg(10,'Loading boundaries...');
+  fetch(GEO_URL).then(r=>{if(!r.ok)throw new Error('');return r.json()}).then(d=>{gjD=d;setProg(45,'Boundaries: '+(gjD.features||[]).length);gDone=1;check()}).catch(()=>{st.textContent='GeoJSON not found — upload manually';st.className='gs err';document.getElementById('startBtn').classList.add('show');gDone=1;check()});
+  setTimeout(()=>{if(!gDone){st.textContent='Large file loading... please wait';setProg(35,'Still loading...')}},8000);
+  setTimeout(()=>{if(sDone<need||!gDone){st.textContent='Slow — upload manually';st.className='gs err';document.getElementById('startBtn').classList.add('show')}},30000)}
+
+function finishLoad(){if(gjD&&gsD.length){setProg(60,'Merging...');setTimeout(()=>{
+  try{
+    mergeAll();buildHubList();setProg(80,'Setting up filters...');
+    setTimeout(()=>{
+      try{
+        pf3();af3();
+        setProg(100,'Done!');
+        document.getElementById('gsSt').textContent='Loaded successfully';document.getElementById('gsSt').className='gs ok';
+        document.getElementById('app').style.display='flex';
+        setTimeout(()=>{document.getElementById('lo').classList.add('hide');map.invalidateSize()},200);
+      }catch(err){console.error('Setup error:',err);document.getElementById('gsSt').textContent='Error: '+err.message;document.getElementById('gsSt').className='gs err';document.getElementById('startBtn').classList.add('show')}
+    },100);
+  }catch(err){console.error('Merge error:',err);document.getElementById('gsSt').textContent='Merge error: '+err.message;document.getElementById('gsSt').className='gs err';document.getElementById('startBtn').classList.add('show')}
+  },100)}
+  else{document.getElementById('startBtn').classList.add('show');setProg(100,'Upload manually')}}
+
+function startPortal(){document.getElementById('startBtn').style.display='none';finishLoad()}
+document.addEventListener("DOMContentLoaded",function(){setTimeout(autoLoad,300)});
+
+function refreshAll(){const sp=document.getElementById('rSp');sp.style.display='inline-block';let d=0;
+  const f=()=>{d++;if(d>=2){sp.style.display='none';mergeAll();buildHubList();hubMergerCache={};pf3();af3();alert('Refreshed!')}};
+  Papa.parse(GURL(GID_BASE),{download:true,header:true,skipEmptyLines:true,dynamicTyping:false,complete:r=>{if(r.data?.length){gsD=r.data;gsD.forEach(row=>{if(row.Pincode)row.Pincode=String(row.Pincode).trim().split('.')[0]})}f()},error:f});
+  Papa.parse(GURL(GID_HUB),{download:true,header:true,skipEmptyLines:true,dynamicTyping:false,complete:r=>{if(r.data?.length)hmD=r.data;f()},error:f})}
+
+function mergeAll(){const gM={};(gjD.features||[]).forEach(f=>{const p=String(f.properties.Pincode||'').trim().split('.')[0];if(p)gM[p]=f});
+  aM=[];const mt=new Set;gsD.forEach(row=>{const p=gv(row,'Pincode'),g=gM[p];aM.push({...row,_g:!!g,_geo:g?g.geometry:null});if(g)mt.add(p)});
+  (gjD.features||[]).forEach(f=>{const p=String(f.properties.Pincode||'').trim().split('.')[0];if(!mt.has(p))aM.push({Pincode:p,...f.properties,_g:true,_geo:f.geometry})})}
+
+function buildHubList(){const hs=new Set;aM.forEach(d=>{['Current Serviceable Hub','Final Hub','S1 Mapping Hub','Proposed Hub Name','Conversion Hub name'].forEach(k=>{const v=gv(d,k);if(v&&v!=='-'&&v.toLowerCase()!=='na')hs.add(v)})});allHubNames=[...hs].sort()}
+
+function mkHubPop(nm,items){const s=items.filter(d=>isSvc(d)).length,n=items.filter(d=>isNS(d)).length,adl=items.reduce((a,d)=>a+(parseFloat(gv(d,'Pincode ADL')||gv(d,'Promised ADL'))||0),0),pins=items.slice(0,20).map(d=>gv(d,'Pincode')).filter(Boolean).join(', ');
+  return`<div><div class="hp-t">${nm}</div><div class="hp-ch"><div class="hp-c">${items.length} pins</div><div class="hp-c">${s} Svc</div><div class="hp-c">${n} Non</div><div class="hp-c">ADL:${Math.round(adl)}</div></div><div style="font-size:8px;color:var(--txl);line-height:1.4;max-height:80px;overflow-y:auto"><strong>Pins:</strong> ${pins}${items.length>20?'...':''}</div></div>`}
+
+function mkPop(d){const rm=gv(d,'Serviceability Remarks');let bc='#c62828';if(isSvc(d))bc='#2e7d32';else if(isRe(d))bc='#e65100';
+  const badge=rm?`<span style="display:inline-block;padding:2px 7px;border-radius:5px;font-size:8px;font-weight:700;text-transform:uppercase;margin:2px 0 4px;background:${bc}15;color:${bc}">${rm}</span>`:'';
+  let rows='';['POD','City','State','Region','Pin Type','Current Serviceable Hub','hub_category','Final Hub','Hub Type','Pincode ADL','Hub ADL','Distance','Serviceability Remarks'].forEach(k=>{const v=gv(d,k);if(v&&v!=='-'&&v!=='0'&&v.toLowerCase()!=='na')rows+=`<tr><td>${k}</td><td>${v}</td></tr>`});
+  return`<div style="text-align:center"><div class="popt">${gv(d,'Pincode')}</div>${badge}</div><table class="poptbl">${rows||'<tr><td colspan="2" style="text-align:center;color:#aaa;padding:5px">No data</td></tr>'}</table>`}
+
+function getCascaded(data,regionVal){const st=new Set,p=new Set,c=new Set;data.forEach(d=>{if(regionVal&&gv(d,'Region')!==regionVal)return;st.add(gv(d,'State'));p.add(gv(d,'POD'));c.add(gv(d,'City'))});return{states:[...st].filter(Boolean).sort(),pods:[...p].filter(Boolean).sort(),cities:[...c].filter(Boolean).sort()}}
+
+/* ════════════════════════════════════════════════════════════
+   HUB ANOMALY LOGIC
+   ════════════════════════════════════════════════════════════ */
+function pf3(){const sets={pt:new Set,r:new Set,st:new Set,p:new Set,c:new Set,sr:new Set};aM.forEach(d=>{if(!gv(d,'Current Serviceable Hub'))return;sets.pt.add(gv(d,'Pin Type'));sets.r.add(gv(d,'Region'));sets.st.add(gv(d,'State'));sets.p.add(gv(d,'POD'));sets.c.add(gv(d,'City'));sets.sr.add(gv(d,'Serviceability Remarks'))});
+  createSS('ss_f3anom',['Outside Boundary','Inside Boundary'],'af3()');
+  const remarks=new Set;hmD.forEach(h=>{const r=gv(h,'Remarks');if(r)remarks.add(r)});
+  createSS('ss_f3merger',[...remarks].filter(Boolean),'af3()');
+  createSS('ss_f3pt',[...sets.pt],'af3()');createSS('ss_f3r',[...sets.r],'cascadeF3()');createSS('ss_f3st',[...sets.st],'af3()');createSS('ss_f3p',[...sets.p],'cascadeF3Pod()');createSS('ss_f3c',[...sets.c],'af3()');createSS('ss_f3sr',[...sets.sr],'af3()');
+  const anomSel=document.getElementById('ss_f3anom_sel');if(anomSel)anomSel.value='Outside Boundary'}
+
+function cascadeF3(){const reg=getSSVal('ss_f3r');const hubData=aM.filter(d=>gv(d,'Current Serviceable Hub'));const cas=getCascaded(hubData,reg);createSS('ss_f3st',cas.states,'af3()');createSS('ss_f3p',cas.pods,'cascadeF3Pod()');createSS('ss_f3c',cas.cities,'af3()');af3()}
+function cascadeF3Pod(){const reg=getSSVal('ss_f3r'),pod=getSSVal('ss_f3p');const cities=new Set;aM.forEach(d=>{if(!gv(d,'Current Serviceable Hub'))return;if(reg&&gv(d,'Region')!==reg)return;if(pod&&gv(d,'POD')!==pod)return;const c=gv(d,'City');if(c)cities.add(c)});createSS('ss_f3c',[...cities].sort(),'af3()');af3()}
+
+function af3(){const f={pt:getSSVal('ss_f3pt'),r:getSSVal('ss_f3r'),st:getSSVal('ss_f3st'),p:getSSVal('ss_f3p'),c:getSSVal('ss_f3c'),sr:getSSVal('ss_f3sr')};
+  fM3=aM.filter(d=>{if(!gv(d,'Current Serviceable Hub'))return 0;if(f.pt&&gv(d,'Pin Type')!==f.pt)return 0;if(f.r&&gv(d,'Region')!==f.r)return 0;if(f.st&&gv(d,'State')!==f.st)return 0;if(f.p&&gv(d,'POD')!==f.p)return 0;if(f.c&&gv(d,'City')!==f.c)return 0;if(f.sr&&gv(d,'Serviceability Remarks')!==f.sr)return 0;return 1});
+  buildHubAnomaly()}
+
+function rf3(){['ss_f3anom','ss_f3merger','ss_f3pt','ss_f3r','ss_f3st','ss_f3p','ss_f3c','ss_f3sr'].forEach(clearSS);
+  const anomSel=document.getElementById('ss_f3anom_sel');if(anomSel)anomSel.value='Outside Boundary';clrHub();af3()}
+
+function getHMData(hubName){return hmD.find(h=>gv(h,'Hub name')===hubName)||null}
+function getHubMergedBoundary(hubName,geoItems){if(hubMergerCache[hubName])return hubMergerCache[hubName];let merged=null;geoItems.forEach(d=>{try{const p=turf.feature(d._geo);if(!merged)merged=p;else merged=turf.union(merged,p)}catch(e){}});hubMergerCache[hubName]=merged;return merged}
+
+function buildHubAnomaly(){
+  hbL.clearLayers();hmL.clearLayers();hubBdData=[];
+  const anomFilter=getSSVal('ss_f3anom'),mergerFilter=getSSVal('ss_f3merger');
+  const groups={};fM3.forEach(d=>{const h=gv(d,'Current Serviceable Hub');if(!h||h==='-')return;if(!groups[h])groups[h]={pins:[],lat:null,lng:null,cat:''};groups[h].pins.push(d);
+    if(!groups[h].lat){const la=parseFloat(gv(d,'Hub Lat')),lo=parseFloat(gv(d,'Hub Long'));if(!isNaN(la)&&!isNaN(lo)){groups[h].lat=la;groups[h].lng=lo;groups[h].cat=gv(d,'hub_category')}}});
+  let totalH=0,insideC=0,outsideC=0,mergerC=0,totalP=fM3.length;
+  Object.entries(groups).forEach(([name,data])=>{
+    const geo=data.pins.filter(d=>d._g&&d._geo);if(!geo.length)return;
+    let merged=getHubMergedBoundary(name,geo);if(!merged)return;
+    let isIn=false;const hasLatLng=data.lat&&data.lng;
+    if(hasLatLng){try{isIn=turf.booleanPointInPolygon(turf.point([data.lng,data.lat]),merged)}catch(e){}}
+    if(isIn)insideC++;else if(hasLatLng)outsideC++;
+    if(!hasLatLng)outsideC++;
+    totalH++;
+    const hm=getHMData(name);if(hm&&gv(hm,'Merger Type'))mergerC++;
+    const nearHub=hm?gv(hm,'Nearest hub'):'';const hvDist=hm?gv(hm,'Havsersine distance'):'';const osmDist=hm?gv(hm,'Osrm Distance'):'';const mType=hm?gv(hm,'Merger Type'):'';const remarks=hm?gv(hm,'Remarks'):'';const cityType=hm?gv(hm,'City Type'):'';
+    const svcC=data.pins.filter(d=>isSvc(d)).length,nsC=data.pins.filter(d=>isNS(d)).length;
+    const adl=data.pins.reduce((a,d)=>a+(parseFloat(gv(d,'Pincode ADL')||gv(d,'Promised ADL'))||0),0);
+    const isSelf=(data.cat||'').toUpperCase().includes('SELF');
+    hubBdData.push({name,pinCount:data.pins.length,svcC,nsC,adl,isIn,nearHub,hvDist,osmDist,mType,remarks,cityType,cat:data.cat,lat:data.lat,lng:data.lng,isSelf,hasLatLng});
+    if(anomFilter==='Outside Boundary'&&isIn)return;
+    if(anomFilter==='Inside Boundary'&&!isIn)return;
+    if(mergerFilter&&remarks!==mergerFilter)return;
+    if(anomFilter==='Outside Boundary'&&!hasLatLng)return;
+    const col=isIn?'#0B9B8A':'#e53935';
+    const bLyr=L.geoJSON(merged,{style:{fillColor:col,fillOpacity:.1,weight:3,color:col,opacity:.7,dashArray:isIn?'':'6,4'}});
+    bLyr.on('click',()=>{if(mMode)return;bLyr.bindPopup(mkHubAnomalyPop(name,data.pins.length,svcC,nsC,adl,isIn,nearHub,hvDist,osmDist,mType,remarks,cityType,data.cat),{maxWidth:400}).openPopup()});
+    hbL.addLayer(bLyr);
+    if(hasLatLng){
+      const ic=isSelf?'#43a047':'#ff9800',stl=isSelf?'#1b5e20':'#e65100';
+      const icon=L.divIcon({className:'hub-home-icon',html:`<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 21V10l9-7 9 7v11H14v-6h-4v6z" fill="${ic}" stroke="${stl}" stroke-width="1.5" stroke-linejoin="round"/></svg>`,iconSize:[18,18],iconAnchor:[9,18],popupAnchor:[0,-18]});
+      hmL.addLayer(L.marker([data.lat,data.lng],{icon}).bindPopup(mkHubAnomalyPop(name,data.pins.length,svcC,nsC,adl,isIn,nearHub,hvDist,osmDist,mType,remarks,cityType,data.cat),{maxWidth:400}))}
+  });
+  document.getElementById('k3h').textContent=totalH;document.getElementById('k3in').textContent=insideC;document.getElementById('k3out').textContent=outsideC;document.getElementById('k3m').textContent=mergerC;document.getElementById('k3p').textContent=totalP.toLocaleString()}
+
+function mkHubAnomalyPop(nm,pins,svc,ns,adl,isIn,near,hvD,osmD,mType,remarks,cityType,cat){
+  const status=isIn?'<span style="background:rgba(67,160,71,.1);color:#2e7d32;padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700">Inside</span>':'<span style="background:rgba(229,57,53,.1);color:#c62828;padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700">Outside</span>';
+  let extra='';if(cat)extra+=`<tr><td>Hub Category</td><td>${cat}</td></tr>`;if(near)extra+=`<tr><td>Nearest Hub</td><td>${near}</td></tr>`;if(hvD)extra+=`<tr><td>Haversine Dist</td><td>${hvD} km</td></tr>`;if(osmD)extra+=`<tr><td>OSRM Dist</td><td>${osmD} km</td></tr>`;if(mType)extra+=`<tr><td>Merger Type</td><td>${mType}</td></tr>`;if(remarks)extra+=`<tr><td>Remarks</td><td>${remarks}</td></tr>`;if(cityType)extra+=`<tr><td>City Type</td><td>${cityType}</td></tr>`;
+  return`<div><div class="hp-t">${nm}</div><div style="text-align:center;margin-bottom:6px">${status}</div><div class="hp-ch"><div class="hp-c">${pins} pins</div><div class="hp-c">${svc} Svc</div><div class="hp-c">${ns} Non</div><div class="hp-c">ADL:${Math.round(adl)}</div></div>${extra?'<table class="poptbl">'+extra+'</table>':''}</div>`}
+
+let hubTableVisible=false;
+function toggleHubTable(){
+  const panel=document.getElementById('hubTablePanel');hubTableVisible=!hubTableVisible;
+  if(hubTableVisible){
+    const anomF=getSSVal('ss_f3anom'),mergerF=getSSVal('ss_f3merger');
+    let filtered=hubBdData;
+    if(anomF==='Outside Boundary')filtered=filtered.filter(h=>!h.isIn);
+    if(anomF==='Inside Boundary')filtered=filtered.filter(h=>h.isIn);
+    if(mergerF)filtered=filtered.filter(h=>h.remarks===mergerF);
+    let html=`<table style="width:100%;border-collapse:collapse;font-size:9px"><thead><tr style="background:var(--teal);color:white;position:sticky;top:0"><th style="padding:4px 6px;text-align:left">Hub</th><th style="padding:4px 6px">Type</th><th style="padding:4px 6px">Pins</th><th style="padding:4px 6px">Status</th><th style="padding:4px 6px">Nearest</th><th style="padding:4px 6px">Dist</th><th style="padding:4px 6px">Merger</th><th style="padding:4px 6px">Remarks</th></tr></thead><tbody>`;
+    filtered.sort((a,b)=>a.name.localeCompare(b.name)).forEach(h=>{html+=`<tr style="cursor:pointer;border-bottom:1px solid #f0f2f4" onclick="zoomHub('${h.name.replace(/'/g,"\\'")}')"><td style="padding:4px 6px;font-weight:600">${h.name}</td><td style="padding:4px 6px;color:${h.isSelf?'#2e7d32':'#e65100'}">${h.cat||'-'}</td><td style="padding:4px 6px;text-align:center">${h.pinCount}</td><td style="padding:4px 6px;text-align:center;color:${h.isIn?'#2e7d32':'#c62828'}">${h.isIn?'Inside':'Outside'}</td><td style="padding:4px 6px">${h.nearHub||'-'}</td><td style="padding:4px 6px">${h.hvDist||'-'}</td><td style="padding:4px 6px">${h.mType||'-'}</td><td style="padding:4px 6px;color:var(--txl)">${h.remarks||'-'}</td></tr>`});
+    html+='</tbody></table>';
+    document.getElementById('hubTableContent').innerHTML=html;
+    panel.style.display='block';document.getElementById('hubTableBtn').textContent='Hide Hub List'}
+  else{panel.style.display='none';document.getElementById('hubTableBtn').textContent='Show Hub List'}}
+
+function zoomHub(nm){hmL.eachLayer(l=>{if(l.getPopup){const c=l.getPopup()?.getContent()||'';if(c.includes(nm)){map.setView(l.getLatLng(),11);setTimeout(()=>l.openPopup(),200)}}})}
+
+/* ════════════════════════════════════════════════════════════
+   HUB SEARCH
+   ════════════════════════════════════════════════════════════ */
+function hubDD(){const inp=document.getElementById('hdi'),list=document.getElementById('hdl'),q=inp.value.toLowerCase();
+  const m=allHubNames.filter(h=>h.toLowerCase().includes(q)).slice(0,25);if(!m.length||!q){list.classList.remove('open');return}
+  list.innerHTML=m.map(h=>`<div class="hub-dd-item" onclick="selHub('${h.replace(/'/g,"\\'")}')">${h}</div>`).join('');list.classList.add('open')}
+
+function selHub(nm){document.getElementById('hdi').value=nm;document.getElementById('hdl').classList.remove('open');doHubSrch(nm)}
+
+document.addEventListener('click',e=>{const l=document.getElementById('hdl');if(l&&!l.parentElement.contains(e.target))l.classList.remove('open')});
+
+function doHubSrch(nm){const vl=nm.toLowerCase();
+  const hp=aM.filter(d=>{const h=gv(d,'Current Serviceable Hub').toLowerCase();return h.includes(vl)&&d._g&&d._geo});
+  if(!hp.length){alert('Hub not found');return}
+  if(hsL)map.removeLayer(hsL);
+  const sl=L.layerGroup();try{let mg=null;hp.forEach(d=>{try{const p=turf.feature(d._geo);if(!mg)mg=p;else mg=turf.union(mg,p)}catch(e){}});
+    if(mg){const b=L.geoJSON(mg,{style:{fillColor:'#0B6B5A',fillOpacity:.08,weight:5,color:'#0B6B5A',opacity:.9}});b.on('click',()=>{if(mMode)return;b.bindPopup(mkHubPop(nm,hp),{maxWidth:380}).openPopup()});sl.addLayer(b)}}catch(e){}
+  hp.forEach(d=>{const l=L.geoJSON({type:'Feature',geometry:d._geo},{style:{fillColor:'#0B6B5A',fillOpacity:.12,weight:1,color:'#0B6B5A',opacity:.4}});l.on('click',()=>{if(mMode)return;l.bindPopup(mkPop(d),{maxWidth:300}).openPopup()});sl.addLayer(l)});
+  let hLat=null,hLng=null,hCat=false;hp.forEach(d=>{if(!hLat){const la=parseFloat(gv(d,'Hub Lat')),lo=parseFloat(gv(d,'Hub Long'));if(!isNaN(la)&&!isNaN(lo)){hLat=la;hLng=lo;hCat=(gv(d,'hub_category')||'').toUpperCase().includes('SELF')}}});
+  if(hLat&&hLng)sl.addLayer(L.marker([hLat,hLng],{icon:L.divIcon({className:'hub-home-icon',html:`<svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 21V10l9-7 9 7v11H14v-6h-4v6z" fill="${hCat?'#43a047':'#ff9800'}" stroke="${hCat?'#1b5e20':'#e65100'}" stroke-width="1.5" stroke-linejoin="round"/></svg>`,iconSize:[16,16],iconAnchor:[8,16],popupAnchor:[0,-16]})}).bindPopup(mkHubPop(nm,hp),{maxWidth:380}));
+  sl.addTo(map);hsL=sl;const hscBtn=document.getElementById('hsc');if(hscBtn)hscBtn.style.display='block';
+  try{map.fitBounds(L.geoJSON({type:'FeatureCollection',features:hp.map(d=>({type:'Feature',geometry:d._geo}))}).getBounds(),{padding:[30,30]})}catch(e){if(hLat)map.setView([hLat,hLng],12)}}
+
+function clrHub(){if(hsL){map.removeLayer(hsL);hsL=null}document.getElementById('hdi').value='';
+  const btn=document.getElementById('hsc');if(btn)btn.style.display='none';
+  try{map.setView([22.5,82],5)}catch(e){}}
+
+/* ════════════════════════════════════════════════════════════
+   FILE UPLOADS
+   ════════════════════════════════════════════════════════════ */
+document.getElementById('geoF').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{gjD=JSON.parse(ev.target.result);if(gsD.length)finishLoad()}catch(err){alert(err.message)}};r.readAsText(f)});
+document.getElementById('csvF').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const p=Papa.parse(ev.target.result,{header:true,skipEmptyLines:true,dynamicTyping:false});if(p.data?.length){gsD=p.data;gsD.forEach(row=>{if(row.Pincode)row.Pincode=String(row.Pincode).trim().split('.')[0]});if(gjD)finishLoad()}};r.readAsText(f)});
+document.getElementById('gfT').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{gjD=JSON.parse(ev.target.result);hubMergerCache={};mergeAll();buildHubList();pf3();af3()}catch(err){alert(err.message)}};r.readAsText(f)});
+
+/* ════════════════════════════════════════════════════════════
+   MEASURE DISTANCE
+   ════════════════════════════════════════════════════════════ */
+const SPEED_TIERS=[{max:5,spd:22},{max:15,spd:28},{max:50,spd:35},{max:Infinity,spd:45}];
+function indiaTime(km){let rem=km,tot=0;for(let i=0;i<SPEED_TIERS.length&&rem>0;i++){const prev=i===0?0:SPEED_TIERS[i-1].max;const bw=SPEED_TIERS[i].max-prev;const ib=Math.min(rem,bw);tot+=(ib/SPEED_TIERS[i].spd)*60;rem-=ib}return tot}
+
+let mMode=null, mWaypoints=[], mMarkers=[], mAerialLines=[], mRouteLines=[];
+let mSegments=[], mOsrmGeo=null, mDistType='route';
+const M_LABELS='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const M_COLORS=['#e65100','#0B9B8A','#1565c0','#c62828','#6a1b9a','#00838f','#ef6c00','#2e7d32'];
+
+function fetchOSRM4(pts){
+  const c=pts.map(p=>p.lng+','+p.lat).join(';');
+  return fetch('https://router.project-osrm.org/route/v1/driving/'+c+'?overview=full&geometries=geojson&steps=false')
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+    .then(d=>{if(d.code!=='Ok'||!d.routes.length)throw new Error('No route');const rt=d.routes[0];
+      return{geometry:rt.geometry,legs:rt.legs.map(l=>({distance_km:l.distance/1000,duration_min:l.duration/60}))}})
+    .catch(e=>{console.warn('OSRM:',e.message);return null})
+}
+
+function mClearAll(){
+  mMarkers.forEach(mk=>{try{map.removeLayer(mk)}catch(e){}});
+  mAerialLines.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
+  mRouteLines.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
+  mMarkers=[];mAerialLines=[];mRouteLines=[];mWaypoints=[];mSegments=[];mOsrmGeo=null;
+  document.getElementById('distPanel').classList.remove('show');
+}
+
+function mAddMarker(lat,lng,idx){
+  const label=M_LABELS[idx]||String(idx+1),color=M_COLORS[idx%M_COLORS.length];
+  const html='<div style="width:24px;height:24px;border-radius:50%;background:'+color+';border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);font-family:Inter,sans-serif">'+label+'</div>';
+  const mk=L.marker([lat,lng],{icon:L.divIcon({className:'',html:html,iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:2000}).addTo(map);
+  mk.bindPopup('<b>'+label+'</b><br>'+lat.toFixed(5)+', '+lng.toFixed(5));
+  mMarkers.push(mk);
+}
+
+function mDrawAerial(){
+  mAerialLines.forEach(l=>{try{map.removeLayer(l)}catch(e){}});mAerialLines=[];
+  for(let i=0;i<mWaypoints.length-1;i++){
+    const line=L.polyline([[mWaypoints[i].lat,mWaypoints[i].lng],[mWaypoints[i+1].lat,mWaypoints[i+1].lng]],{color:'#e65100',weight:3,dashArray:'8,6',opacity:.9}).addTo(map);
+    mAerialLines.push(line);
+  }
+}
+
+function mDrawRoute(){
+  mRouteLines.forEach(l=>{try{map.removeLayer(l)}catch(e){}});mRouteLines=[];
+  if(!mOsrmGeo)return;
+  const layer=L.geoJSON(mOsrmGeo,{style:{color:'#0B9B8A',weight:5,opacity:.9}}).addTo(map);
+  mRouteLines.push(layer);
+}
+
+function mUpdateLines(){
+  mAerialLines.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
+  mRouteLines.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
+  mAerialLines=[];mRouteLines=[];
+  if(mDistType==='aerial')mDrawAerial();
+  else{if(mOsrmGeo)mDrawRoute();else mDrawAerial()}
+}
+
+function mFmtDist(km){return km<1?(km*1000).toFixed(0)+' m':km.toFixed(2)+' km'}
+function mFmtTime(min){if(min<60)return Math.round(min)+' min';return Math.floor(min/60)+'h '+Math.round(min%60)+'m'}
+function mShowToast(msg){const t=document.getElementById('dToast');t.textContent=msg;t.classList.add('show')}
+function mHideToast(){document.getElementById('dToast').classList.remove('show')}
+function mFitWP(){if(mWaypoints.length<2)return;map.fitBounds(mWaypoints.map(p=>[p.lat,p.lng]),{padding:[50,50]})}
+
+function mRenderPanel(note){
+  const segList=document.getElementById('dSegList');
+  let html='',totalDist=0,totalTime=0;
+  const isRoute=mDistType==='route',color=isRoute?'var(--teal)':'#e65100',icon=isRoute?'🚗':'✈';
+  mSegments.forEach(s=>{
+    const dist=isRoute?(s.route!==null?s.route:s.aerial*1.3):s.aerial;
+    const time=indiaTime(dist);totalDist+=dist;totalTime+=time;
+    html+='<div class="d-seg-row"><span class="seg-label">'+s.from+' → '+s.to+'</span><span class="seg-dist" style="color:'+color+'">'+icon+' '+mFmtDist(dist)+'</span><span class="seg-time">🕐 '+mFmtTime(time)+'</span></div>';
+  });
+  segList.innerHTML=html;
+  document.getElementById('dTotDist').innerHTML='<span style="color:'+color+'">'+icon+' '+mFmtDist(totalDist)+'</span>';
+  document.getElementById('dTotTime').textContent='🕐 '+mFmtTime(totalTime);
+  document.getElementById('dNote').textContent=note||'';
+  document.getElementById('distPanel').classList.add('show');
+}
+
+function onDistTypeChange(){
+  mDistType=document.getElementById('distSel').value;
+  if(mSegments.length){mUpdateLines();
+    const note=mDistType==='route'?(mOsrmGeo?'Route via OSRM | Time: Tier 2 city speed':'⚠ OSRM unavailable — 1.3× aerial'):'Aerial (haversine) | Time: Tier 2 city speed';
+    mRenderPanel(note)}
+}
+
+function mComputeAll(){
+  if(mWaypoints.length<2)return;
+  mSegments=[];
+  for(let i=0;i<mWaypoints.length-1;i++){
+    const km=haversine(mWaypoints[i].lat,mWaypoints[i].lng,mWaypoints[i+1].lat,mWaypoints[i+1].lng);
+    mSegments.push({from:M_LABELS[i],to:M_LABELS[i+1],aerial:km,route:null});
+  }
+  mUpdateLines();mRenderPanel('Fetching route...');mFitWP();
+  fetchOSRM4(mWaypoints).then(osrm=>{
+    if(osrm){mOsrmGeo=osrm.geometry;for(let k=0;k<mSegments.length;k++){if(osrm.legs[k])mSegments[k].route=osrm.legs[k].distance_km}mUpdateLines();
+      mRenderPanel(mDistType==='route'?'Route via OSRM | Time: Tier 2 city speed':'Aerial (haversine) | Time: Tier 2 city speed')}
+    else{for(let j=0;j<mSegments.length;j++)mSegments[j].route=mSegments[j].aerial*1.3;mUpdateLines();
+      mRenderPanel(mDistType==='route'?'⚠ OSRM unavailable — 1.3× aerial':'Aerial (haversine) | Time: Tier 2 city speed')}
+  });
+}
+
+map.on('click',function(e){
+  if(mMode!=='measure')return;
+  mWaypoints.push({lat:e.latlng.lat,lng:e.latlng.lng});
+  mAddMarker(e.latlng.lat,e.latlng.lng,mWaypoints.length-1);
+  if(mWaypoints.length>=2)mComputeAll();
+  setTimeout(()=>map.closePopup(),10);
+  mShowToast(mWaypoints.length+' points — click more or ESC');
+});
+
+function toggleMeasure(){
+  if(mMode==='measure'){stopMeasure();return}
+  startMeasureMode();
+}
+
+function startMeasureMode(){
+  stopMeasure();
+  mMode='measure';
+  map.closePopup();
+  document.body.classList.add('crosshair-mode');
+  document.getElementById('btnMeasure').classList.add('active');
+  document.getElementById('btnMStop').style.display='inline-flex';
+  mShowToast('Click points on the map — ESC to clear');
+}
+
+function stopMeasure(){
+  if(mMode){mClearAll()}
+  mMode=null;
+  document.body.classList.remove('crosshair-mode');
+  const btn=document.getElementById('btnMeasure');if(btn)btn.classList.remove('active');
+  const stp=document.getElementById('btnMStop');if(stp)stp.style.display='none';
+  mHideToast();
+}
+
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&mMode)stopMeasure()});
+</script>
+</body>
+</html>
